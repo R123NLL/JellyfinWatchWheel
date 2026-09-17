@@ -1,19 +1,29 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <RootNamespace>Jellyfin.Plugin.Template</RootNamespace>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Nullable>enable</Nullable>
-    <AnalysisMode>AllEnabledByDefault</AnalysisMode>
-  </PropertyGroup>
+  <TargetFramework>net9.0</TargetFramework>
+
+  <RootNamespace>Jellyfin.Plugin.WatchWheel</RootNamespace>
+  <AssemblyName>Jellyfin.Plugin.WatchWheel</AssemblyName>
+
+  <Version>1.0.0</Version>
+  <AssemblyVersion>1.0.0.0</AssemblyVersion>
+  <FileVersion>1.0.0.0</FileVersion>
+
+  <Authors>Denis</Authors>
+  <Description>Spin a wheel to choose something unwatched from your Jellyfin library.</Description>
+
+  <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  <Nullable>enable</Nullable>
+  <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+</PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Jellyfin.Controller" Version="10.11.5" >
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.11">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="Jellyfin.Model" Version="10.11.5">
+    <PackageReference Include="Jellyfin.Model" Version="10.11.11">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
   </ItemGroup>
@@ -25,8 +35,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="Configuration\configPage.html" />
-    <EmbeddedResource Include="Configuration\configPage.html" />
-  </ItemGroup>
+  <None Remove="Configuration\configPage.html" />
+  <EmbeddedResource Include="Configuration\configPage.html" />
+
+  <None Remove="Web\watchWheel.html" />
+  <EmbeddedResource Include="Web\watchWheel.html" />
+
+  <None Remove="Web\watchWheel.js" />
+  <EmbeddedResource Include="Web\watchWheel.js" />
+
+  <None Remove="Web\watchWheel.css" />
+  <EmbeddedResource Include="Web\watchWheel.css" />
+</ItemGroup>
 
 </Project>

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Watch Wheel</title>
+</head>
+
+<body>
+<div
+    id="WatchWheelPage"
+    data-role="page"
+    class="page type-interior pluginConfigurationPage">
+
+    <div data-role="content">
+        <div class="content-primary watchWheelShell">
+
+            <div class="watchWheelHeader">
+                <div>
+                    <h1>Watch Wheel</h1>
+                    <p>
+                        Can't decide what to watch?
+                        Let Jellyfin choose.
+                    </p>
+                </div>
+
+                <div class="candidateBadge">
+                    <span id="candidateCount">0</span>
+                    <span>choices</span>
+                </div>
+            </div>
+
+            <section class="filterPanel">
+
+                <div class="filterField">
+                    <label for="wwType">Media Type</label>
+
+                    <select id="wwType" class="emby-select">
+                        <option value="both">Movies + TV</option>
+                        <option value="movie">Movies Only</option>
+                        <option value="series">TV Shows Only</option>
+                    </select>
+                </div>
+
+                <div class="filterField">
+                    <label for="wwGenre">Genre</label>
+
+                    <select id="wwGenre" class="emby-select">
+                        <option value="">Any Genre</option>
+                    </select>
+                </div>
+
+                <div class="filterField">
+                    <label for="wwDecade">Decade</label>
+
+                    <select id="wwDecade" class="emby-select">
+                        <option value="">Any Decade</option>
+                    </select>
+                </div>
+
+                <div class="filterField filterCheckbox">
+                    <label>
+                        <input
+                            id="wwInProgress"
+                            type="checkbox"
+                            checked>
+                        <span>Include in-progress titles</span>
+                    </label>
+                </div>
+
+                <button
+                    id="wwApplyFilters"
+                    type="button"
+                    class="raised emby-button button-submit">
+                    Refresh Wheel
+                </button>
+
+            </section>
+
+            <div id="wwMessage" class="watchWheelMessage"></div>
+
+            <section class="wheelSection">
+
+                <div class="wheelContainer">
+
+                    <div class="wheelPointer"></div>
+
+                    <canvas
+                        id="watchWheelCanvas"
+                        width="800"
+                        height="800">
+                    </canvas>
+
+                    <button
+                        id="wwSpin"
+                        type="button"
+                        class="spinButton">
+                        SPIN
+                    </button>
+
+                </div>
+
+            </section>
+
+            <section id="winnerCard" class="winnerCard hidden">
+
+                <div class="winnerPosterWrapper">
+                    <img
+                        id="winnerPoster"
+                        class="winnerPoster"
+                        alt="">
+                </div>
+
+                <div class="winnerInfo">
+
+                    <div class="winnerEyebrow">
+                        THE WHEEL HAS SPOKEN
+                    </div>
+
+                    <h2 id="winnerTitle"></h2>
+
+                    <div id="winnerMeta" class="winnerMeta"></div>
+
+                    <div id="winnerGenres" class="winnerGenres"></div>
+
+                    <p id="winnerOverview"></p>
+
+                    <div class="winnerActions">
+
+                        <button
+                            id="wwOpen"
+                            type="button"
+                            class="raised emby-button button-submit">
+                            Open in Jellyfin
+                        </button>
+
+                        <button
+                            id="wwRemove"
+                            type="button"
+                            class="raised emby-button">
+                            Remove from Wheel
+                        </button>
+
+                        <button
+                            id="wwAgain"
+                            type="button"
+                            class="raised emby-button">
+                            Spin Again
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            function loadWatchWheelAssets() {
+                var cssId = 'watchWheelPluginCss';
+
+                if (!document.getElementById(cssId)) {
+                    var css = document.createElement('link');
+
+                    css.id = cssId;
+                    css.rel = 'stylesheet';
+                    css.href =
+                        'configurationpage?name=watchWheel.css';
+
+                    document.head.appendChild(css);
+                }
+
+                if (window.WatchWheelApp) {
+                    window.WatchWheelApp.init(
+                        document.getElementById('WatchWheelPage')
+                    );
+
+                    return;
+                }
+
+                var script = document.createElement('script');
+
+                script.src =
+                    'configurationpage?name=watchWheel.js';
+
+                script.onload = function () {
+                    if (window.WatchWheelApp) {
+                        window.WatchWheelApp.init(
+                            document.getElementById('WatchWheelPage')
+                        );
+                    }
+                };
+
+                document.head.appendChild(script);
+            }
+
+            loadWatchWheelAssets();
+        })();
+    </script>
+
+</div>
+</body>
+</html>

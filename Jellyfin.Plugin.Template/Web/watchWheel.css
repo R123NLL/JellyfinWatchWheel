@@ -1,0 +1,330 @@
+.watchWheelShell {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-bottom: 80px;
+}
+
+.watchWheelHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 28px;
+}
+
+.watchWheelHeader h1 {
+    margin-bottom: 4px;
+    font-size: 2.4rem;
+}
+
+.watchWheelHeader p {
+    opacity: 0.72;
+    margin-top: 0;
+}
+
+.candidateBadge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 100px;
+    min-height: 72px;
+
+    padding: 10px 18px;
+
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.candidateBadge span:first-child {
+    font-size: 1.7rem;
+    font-weight: 700;
+}
+
+.candidateBadge span:last-child {
+    opacity: 0.7;
+    font-size: 0.85rem;
+}
+
+.filterPanel {
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fit, minmax(170px, 1fr));
+
+    align-items: end;
+    gap: 16px;
+
+    padding: 20px;
+    margin-bottom: 24px;
+
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.055);
+}
+
+.filterField {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.filterField label {
+    font-size: 0.88rem;
+    font-weight: 600;
+    opacity: 0.85;
+}
+
+.filterField select {
+    width: 100%;
+    min-height: 42px;
+}
+
+.filterCheckbox {
+    justify-content: center;
+    min-height: 44px;
+}
+
+.filterCheckbox label {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.watchWheelMessage {
+    text-align: center;
+    min-height: 26px;
+    margin-bottom: 10px;
+    opacity: 0.8;
+}
+
+.wheelSection {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.wheelContainer {
+    position: relative;
+
+    width: min(78vw, 720px);
+    aspect-ratio: 1 / 1;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#watchWheelCanvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+
+    border-radius: 50%;
+
+    filter:
+        drop-shadow(0 20px 35px rgba(0, 0, 0, 0.35));
+}
+
+.wheelPointer {
+    position: absolute;
+
+    z-index: 5;
+
+    top: -4px;
+    left: 50%;
+
+    width: 0;
+    height: 0;
+
+    transform: translateX(-50%);
+
+    border-left: 18px solid transparent;
+    border-right: 18px solid transparent;
+    border-top: 34px solid #ffffff;
+
+    filter:
+        drop-shadow(0 4px 4px rgba(0, 0, 0, 0.45));
+}
+
+.spinButton {
+    position: absolute;
+
+    z-index: 6;
+
+    width: 118px;
+    height: 118px;
+
+    border: 8px solid rgba(255, 255, 255, 0.7);
+    border-radius: 50%;
+
+    font-size: 1.15rem;
+    font-weight: 800;
+
+    color: white;
+    background:
+        linear-gradient(
+            135deg,
+            #00a4dc,
+            #7b4dff
+        );
+
+    cursor: pointer;
+
+    box-shadow:
+        0 12px 30px rgba(0, 0, 0, 0.45);
+
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.spinButton:hover:not(:disabled) {
+    transform: scale(1.06);
+}
+
+.spinButton:active:not(:disabled) {
+    transform: scale(0.96);
+}
+
+.spinButton:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.winnerCard {
+    display: grid;
+    grid-template-columns: minmax(180px, 260px) 1fr;
+    gap: 28px;
+
+    margin-top: 40px;
+    padding: 24px;
+
+    border-radius: 22px;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255, 255, 255, 0.09),
+            rgba(255, 255, 255, 0.035)
+        );
+
+    box-shadow:
+        0 18px 50px rgba(0, 0, 0, 0.25);
+}
+
+.hidden {
+    display: none !important;
+}
+
+.winnerPosterWrapper {
+    width: 100%;
+}
+
+.winnerPoster {
+    display: block;
+
+    width: 100%;
+    aspect-ratio: 2 / 3;
+
+    object-fit: cover;
+
+    border-radius: 14px;
+
+    background:
+        rgba(255, 255, 255, 0.06);
+}
+
+.winnerInfo {
+    display: flex;
+    flex-direction: column;
+}
+
+.winnerEyebrow {
+    margin-bottom: 8px;
+
+    font-size: 0.8rem;
+    font-weight: 800;
+
+    letter-spacing: 0.13em;
+
+    opacity: 0.65;
+}
+
+.winnerInfo h2 {
+    margin: 0 0 8px;
+
+    font-size: 2rem;
+}
+
+.winnerMeta {
+    margin-bottom: 12px;
+    opacity: 0.75;
+}
+
+.winnerGenres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+
+    margin-bottom: 14px;
+}
+
+.winnerGenre {
+    padding: 5px 10px;
+
+    border-radius: 999px;
+
+    background:
+        rgba(255, 255, 255, 0.08);
+
+    font-size: 0.82rem;
+}
+
+#winnerOverview {
+    line-height: 1.55;
+    opacity: 0.9;
+}
+
+.winnerActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+
+    margin-top: auto;
+    padding-top: 18px;
+}
+
+@media (max-width: 760px) {
+    .watchWheelHeader {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .candidateBadge {
+        flex-direction: row;
+        gap: 8px;
+
+        min-height: auto;
+    }
+
+    .wheelContainer {
+        width: 94vw;
+    }
+
+    .spinButton {
+        width: 92px;
+        height: 92px;
+
+        border-width: 6px;
+    }
+
+    .winnerCard {
+        grid-template-columns: 1fr;
+    }
+
+    .winnerPoster {
+        max-width: 250px;
+        margin: 0 auto;
+    }
+}
