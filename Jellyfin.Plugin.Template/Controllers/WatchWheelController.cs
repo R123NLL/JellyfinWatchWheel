@@ -1,11 +1,6 @@
-using System;
-using System.Linq;
 using System.Threading.Tasks;
-using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.WatchWheel.Models;
 using Jellyfin.Plugin.WatchWheel.Services;
-using MediaBrowser.Controller.Entities;
-using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,23 +16,23 @@ namespace Jellyfin.Plugin.WatchWheel.Controllers;
 public class WatchWheelController : ControllerBase
 {
     private readonly IAuthorizationContext _authorizationContext;
-    private readonly ILibraryManager _libraryManager;
     private readonly CandidateService _candidateService;
+    private readonly FilterService _filterService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WatchWheelController"/> class.
     /// </summary>
     /// <param name="authorizationContext">Jellyfin authorization context.</param>
-    /// <param name="libraryManager">Jellyfin library manager.</param>
     /// <param name="candidateService">Watch Wheel candidate service.</param>
+    /// <param name="filterService">Watch Wheel filter service.</param>
     public WatchWheelController(
         IAuthorizationContext authorizationContext,
-        ILibraryManager libraryManager,
-        CandidateService candidateService)
+        CandidateService candidateService,
+        FilterService filterService)
     {
         _authorizationContext = authorizationContext;
-        _libraryManager = libraryManager;
         _candidateService = candidateService;
+        _filterService = filterService;
     }
 
     /// <summary>
@@ -145,52 +140,7 @@ public class WatchWheelController : ControllerBase
             return Unauthorized();
         }
 
-        var movieItems = _libraryManager.GetItemList(
-            new InternalItemsQuery(user)
-            {
-                Recursive = true,
-                IsPlayed = false,
-                IncludeItemTypes = [BaseItemKind.Movie],
-                EnableTotalRecordCount = false
-            });
-
-        var seriesItems = _libraryManager.GetItemList(
-            new InternalItemsQuery(user)
-            {
-                Recursive = true,
-                IsPlayed = false,
-                IncludeItemTypes = [BaseItemKind.Series],
-                EnableTotalRecordCount = false
-            });
-
-        var allItems = movieItems
-            .Concat(seriesItems)
-            .ToArray();
-
-        var genres = allItems
-            .SelectMany(item => item.Genres ?? Array.Empty<string>())
-            .Where(itemGenre => !string.IsNullOrWhiteSpace(itemGenre))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(itemGenre => itemGenre)
-            .ToArray();
-
-        var decades = allItems
-            .Where(item => item.ProductionYear.HasValue)
-            .Select(item => (item.ProductionYear!.Value / 10) * 10)
-            .Distinct()
-            .OrderBy(decade => decade)
-            .ToArray();
-
-        return Ok(new
-        {
-            Types = new[]
-            {
-                "both",
-                "movie",
-                "series"
-            },
-            Genres = genres,
-            Decades = decades
-        });
+        return Ok(
+            _filterService.GetAvailableFilters(user));
     }
 }

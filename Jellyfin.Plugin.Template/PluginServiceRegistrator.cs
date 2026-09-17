@@ -16,5 +16,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         IServerApplicationHost applicationHost)
     {
         serviceCollection.AddTransient<CandidateService>();
+        serviceCollection.AddTransient<FilterService>();
     }
 }
