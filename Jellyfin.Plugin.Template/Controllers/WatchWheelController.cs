@@ -2,6 +2,8 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
+using Jellyfin.Plugin.WatchWheel.Models;
+using Jellyfin.Plugin.WatchWheel.Services;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Net;
@@ -20,22 +22,22 @@ public class WatchWheelController : ControllerBase
 {
     private readonly IAuthorizationContext _authorizationContext;
     private readonly ILibraryManager _libraryManager;
-    private readonly IUserDataManager _userDataManager;
+    private readonly CandidateService _candidateService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WatchWheelController"/> class.
     /// </summary>
     /// <param name="authorizationContext">Jellyfin authorization context.</param>
     /// <param name="libraryManager">Jellyfin library manager.</param>
-    /// <param name="userDataManager">Jellyfin user data manager.</param>
+    /// <param name="candidateService">Watch Wheel candidate service.</param>
     public WatchWheelController(
         IAuthorizationContext authorizationContext,
         ILibraryManager libraryManager,
-        IUserDataManager userDataManager)
+        CandidateService candidateService)
     {
         _authorizationContext = authorizationContext;
         _libraryManager = libraryManager;
-        _userDataManager = userDataManager;
+        _candidateService = candidateService;
     }
 
     /// <summary>
@@ -82,16 +84,9 @@ public class WatchWheelController : ControllerBase
     /// <summary>
     /// Gets unwatched movies and television series for the current user.
     /// </summary>
-    /// <param name="type">
-    /// Optional media type filter.
-    /// Supported values: movie, series, tv, both.
-    /// </param>
-    /// <param name="genre">
-    /// Optional genre filter.
-    /// </param>
-    /// <param name="decade">
-    /// Optional decade filter, for example 1990 or 2000.
-    /// </param>
+    /// <param name="type">Optional media type filter.</param>
+    /// <param name="genre">Optional genre filter.</param>
+    /// <param name="decade">Optional decade filter.</param>
     /// <param name="includeInProgress">
     /// Whether partially watched items should be included.
     /// </param>
@@ -115,138 +110,20 @@ public class WatchWheelController : ControllerBase
             return Unauthorized();
         }
 
-        // Query Movies and Series separately.
-        var movieItems = _libraryManager.GetItemList(
-            new InternalItemsQuery(user)
-            {
-                Recursive = true,
-                IsPlayed = false,
-                IncludeItemTypes = [BaseItemKind.Movie],
-                EnableTotalRecordCount = false
-            });
-
-        var seriesItems = _libraryManager.GetItemList(
-            new InternalItemsQuery(user)
-            {
-                Recursive = true,
-                IsPlayed = false,
-                IncludeItemTypes = [BaseItemKind.Series],
-                EnableTotalRecordCount = false
-            });
-
-        var movies = movieItems.Select(item =>
+        var filters = new WatchWheelFilters
         {
-            var userData = _userDataManager.GetUserData(user, item);
+            Type = type ?? "both",
+            Genre = genre,
+            Decade = decade,
+            IncludeInProgress = includeInProgress
+        };
 
-            return new
-            {
-                Id = item.Id,
-                item.Name,
-                Type = "Movie",
-                Year = item.ProductionYear,
-                item.Overview,
-                item.CommunityRating,
-                item.Genres,
-                Played = userData?.Played ?? false,
-                PlaybackPositionTicks =
-                    userData?.PlaybackPositionTicks ?? 0
-            };
-        });
+        var result =
+            _candidateService.GetCandidates(
+                user,
+                filters);
 
-        var series = seriesItems.Select(item =>
-        {
-            var userData = _userDataManager.GetUserData(user, item);
-
-            return new
-            {
-                Id = item.Id,
-                item.Name,
-                Type = "Series",
-                Year = item.ProductionYear,
-                item.Overview,
-                item.CommunityRating,
-                item.Genres,
-                Played = userData?.Played ?? false,
-                PlaybackPositionTicks =
-                    userData?.PlaybackPositionTicks ?? 0
-            };
-        });
-
-        var items = movies.Concat(series);
-
-        // Media type filter.
-        if (!string.IsNullOrWhiteSpace(type))
-        {
-            if (type.Equals(
-                    "movie",
-                    StringComparison.OrdinalIgnoreCase)
-                || type.Equals(
-                    "movies",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                items = items.Where(item => item.Type == "Movie");
-            }
-            else if (type.Equals(
-                         "series",
-                         StringComparison.OrdinalIgnoreCase)
-                     || type.Equals(
-                         "tv",
-                         StringComparison.OrdinalIgnoreCase)
-                     || type.Equals(
-                         "shows",
-                         StringComparison.OrdinalIgnoreCase))
-            {
-                items = items.Where(item => item.Type == "Series");
-            }
-
-            // "both" does not need filtering.
-        }
-
-        // Genre filter.
-        if (!string.IsNullOrWhiteSpace(genre))
-        {
-            items = items.Where(item =>
-                item.Genres?.Any(itemGenre =>
-                    itemGenre.Equals(
-                        genre,
-                        StringComparison.OrdinalIgnoreCase)) == true);
-        }
-
-        // Decade filter.
-        if (decade.HasValue)
-        {
-            var startYear = decade.Value;
-            var endYear = startYear + 9;
-
-            items = items.Where(item =>
-                item.Year.HasValue
-                && item.Year.Value >= startYear
-                && item.Year.Value <= endYear);
-        }
-
-        // Remove partially watched items when requested.
-        if (!includeInProgress)
-        {
-            items = items.Where(item =>
-                item.PlaybackPositionTicks == 0);
-        }
-
-        var result = items
-            .OrderBy(item => item.Name)
-            .ToArray();
-
-        return Ok(new
-        {
-            Count = result.Length,
-            Filters = new
-            {
-                Type = type ?? "both",
-                Genre = genre,
-                Decade = decade,
-                IncludeInProgress = includeInProgress
-            },
-            Items = result
-        });
+        return Ok(result);
     }
 
     /// <summary>
