@@ -68,9 +68,14 @@ public class CandidateService
         var movies = movieItems
             .Where(item => MatchesMetadata(item, filters))
             .Select(item => CreateMovieItem(user, item));
-        var series = seriesItems
+        var matchingSeries = seriesItems
             .Where(item => MatchesMetadata(item, filters))
-            .Select(item => CreateSeriesItem(user, item))
+            .ToArray();
+        var progressBySeries = _tvSeriesService.GetProgressForSeries(
+            user,
+            matchingSeries.Select(item => item.Id));
+        var series = matchingSeries
+            .Select(item => CreateSeriesItem(item, progressBySeries[item.Id]))
             .Where(item => item is not null)
             .Select(item => item!);
 
@@ -107,29 +112,10 @@ public class CandidateService
         return true;
     }
 
-    private WatchWheelItem CreateMovieItem(User user, BaseItem item)
+    private static WatchWheelItem? CreateSeriesItem(
+        BaseItem item,
+        TvSeriesProgress progress)
     {
-        var userData = _userDataManager.GetUserData(user, item);
-        var position = Math.Max(0L, userData?.PlaybackPositionTicks ?? 0L);
-
-        return new WatchWheelItem
-        {
-            Id = item.Id,
-            Name = item.Name,
-            Type = "Movie",
-            Year = item.ProductionYear,
-            Overview = item.Overview,
-            CommunityRating = item.CommunityRating,
-            Genres = item.Genres ?? Array.Empty<string>(),
-            Played = userData?.Played ?? false,
-            IsInProgress = position > 0,
-            PlaybackPositionTicks = position
-        };
-    }
-
-    private WatchWheelItem? CreateSeriesItem(User user, BaseItem item)
-    {
-        var progress = _tvSeriesService.GetProgress(user, item.Id);
         if (!progress.HasUnwatchedEpisodes)
         {
             return null;
@@ -152,6 +138,26 @@ public class CandidateService
             NextEpisodeName = progress.NextEpisodeName,
             NextSeasonNumber = progress.NextSeasonNumber,
             NextEpisodeNumber = progress.NextEpisodeNumber
+        };
+    }
+
+    private WatchWheelItem CreateMovieItem(User user, BaseItem item)
+    {
+        var userData = _userDataManager.GetUserData(user, item);
+        var position = Math.Max(0L, userData?.PlaybackPositionTicks ?? 0L);
+
+        return new WatchWheelItem
+        {
+            Id = item.Id,
+            Name = item.Name,
+            Type = "Movie",
+            Year = item.ProductionYear,
+            Overview = item.Overview,
+            CommunityRating = item.CommunityRating,
+            Genres = item.Genres ?? Array.Empty<string>(),
+            Played = userData?.Played ?? false,
+            IsInProgress = position > 0,
+            PlaybackPositionTicks = position
         };
     }
 }
