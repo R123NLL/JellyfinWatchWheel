@@ -17,5 +17,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     {
         serviceCollection.AddTransient<CandidateService>();
         serviceCollection.AddTransient<FilterService>();
+        serviceCollection.AddTransient<TvSeriesService>();
     }
 }

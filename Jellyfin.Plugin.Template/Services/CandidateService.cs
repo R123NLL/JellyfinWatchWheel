@@ -15,18 +15,22 @@ public class CandidateService
 {
     private readonly ILibraryManager _libraryManager;
     private readonly IUserDataManager _userDataManager;
+    private readonly TvSeriesService _tvSeriesService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CandidateService"/> class.
     /// </summary>
     /// <param name="libraryManager">Jellyfin library manager.</param>
     /// <param name="userDataManager">Jellyfin user data manager.</param>
+    /// <param name="tvSeriesService">Television series progress service.</param>
     public CandidateService(
         ILibraryManager libraryManager,
-        IUserDataManager userDataManager)
+        IUserDataManager userDataManager,
+        TvSeriesService tvSeriesService)
     {
         _libraryManager = libraryManager;
         _userDataManager = userDataManager;
+        _tvSeriesService = tvSeriesService;
     }
 
     /// <summary>
@@ -35,90 +39,43 @@ public class CandidateService
     /// <param name="user">The Jellyfin user.</param>
     /// <param name="filters">The filters to apply.</param>
     /// <returns>The filtered Watch Wheel result.</returns>
-    public WatchWheelResult GetCandidates(
-        User user,
-        WatchWheelFilters filters)
+    public WatchWheelResult GetCandidates(User user, WatchWheelFilters filters)
     {
-        var movieItems = _libraryManager.GetItemList(
-            new InternalItemsQuery(user)
+        var type = filters.Type?.Trim().ToLowerInvariant();
+        var onlyMovies = type is "movie" or "movies";
+        var onlySeries = type is "series" or "tv" or "shows";
+
+        var movieItems = onlySeries
+            ? Array.Empty<BaseItem>()
+            : _libraryManager.GetItemList(new InternalItemsQuery(user)
             {
                 Recursive = true,
                 IsPlayed = false,
                 IncludeItemTypes = [BaseItemKind.Movie],
                 EnableTotalRecordCount = false
-            });
+            }).ToArray();
 
-        var seriesItems = _libraryManager.GetItemList(
-            new InternalItemsQuery(user)
+        // Episode history, rather than the series Played flag, determines eligibility.
+        var seriesItems = onlyMovies
+            ? Array.Empty<BaseItem>()
+            : _libraryManager.GetItemList(new InternalItemsQuery(user)
             {
                 Recursive = true,
-                IsPlayed = false,
                 IncludeItemTypes = [BaseItemKind.Series],
                 EnableTotalRecordCount = false
-            });
+            }).ToArray();
 
-        var movies = movieItems.Select(item =>
-            CreateItem(user, item, "Movie"));
+        var movies = movieItems
+            .Where(item => MatchesMetadata(item, filters))
+            .Select(item => CreateMovieItem(user, item));
+        var series = seriesItems
+            .Where(item => MatchesMetadata(item, filters))
+            .Select(item => CreateSeriesItem(user, item))
+            .Where(item => item is not null)
+            .Select(item => item!);
 
-        var series = seriesItems.Select(item =>
-            CreateItem(user, item, "Series"));
-
-        var items = movies.Concat(series);
-
-        if (!string.IsNullOrWhiteSpace(filters.Type))
-        {
-            if (filters.Type.Equals(
-                    "movie",
-                    StringComparison.OrdinalIgnoreCase)
-                || filters.Type.Equals(
-                    "movies",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                items = items.Where(item =>
-                    item.Type == "Movie");
-            }
-            else if (filters.Type.Equals(
-                         "series",
-                         StringComparison.OrdinalIgnoreCase)
-                     || filters.Type.Equals(
-                         "tv",
-                         StringComparison.OrdinalIgnoreCase)
-                     || filters.Type.Equals(
-                         "shows",
-                         StringComparison.OrdinalIgnoreCase))
-            {
-                items = items.Where(item =>
-                    item.Type == "Series");
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(filters.Genre))
-        {
-            items = items.Where(item =>
-                item.Genres.Any(itemGenre =>
-                    itemGenre.Equals(
-                        filters.Genre,
-                        StringComparison.OrdinalIgnoreCase)));
-        }
-
-        if (filters.Decade.HasValue)
-        {
-            var startYear = filters.Decade.Value;
-            var endYear = startYear + 9;
-
-            items = items.Where(item =>
-                item.Year.HasValue
-                && item.Year.Value >= startYear
-                && item.Year.Value <= endYear);
-        }
-
-        if (!filters.IncludeInProgress)
-        {
-            items = items.Where(item =>
-                item.PlaybackPositionTicks == 0);
-        }
-
-        var result = items
+        var result = movies.Concat(series)
+            .Where(item => filters.IncludeInProgress || !item.IsInProgress)
             .OrderBy(item => item.Name)
             .ToArray();
 
@@ -130,26 +87,71 @@ public class CandidateService
         };
     }
 
-    private WatchWheelItem CreateItem(
-        User user,
-        BaseItem item,
-        string type)
+    private static bool MatchesMetadata(BaseItem item, WatchWheelFilters filters)
     {
-        var userData =
-            _userDataManager.GetUserData(user, item);
+        if (!string.IsNullOrWhiteSpace(filters.Genre)
+            && !(item.Genres ?? Array.Empty<string>()).Any(genre =>
+                string.Equals(genre, filters.Genre, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        if (filters.Decade.HasValue)
+        {
+            var startYear = (long)filters.Decade.Value;
+            return item.ProductionYear.HasValue
+                && item.ProductionYear.Value >= startYear
+                && item.ProductionYear.Value <= startYear + 9;
+        }
+
+        return true;
+    }
+
+    private WatchWheelItem CreateMovieItem(User user, BaseItem item)
+    {
+        var userData = _userDataManager.GetUserData(user, item);
+        var position = Math.Max(0L, userData?.PlaybackPositionTicks ?? 0L);
 
         return new WatchWheelItem
         {
             Id = item.Id,
             Name = item.Name,
-            Type = type,
+            Type = "Movie",
             Year = item.ProductionYear,
             Overview = item.Overview,
             CommunityRating = item.CommunityRating,
-            Genres = item.Genres,
+            Genres = item.Genres ?? Array.Empty<string>(),
             Played = userData?.Played ?? false,
-            PlaybackPositionTicks =
-                userData?.PlaybackPositionTicks ?? 0
+            IsInProgress = position > 0,
+            PlaybackPositionTicks = position
+        };
+    }
+
+    private WatchWheelItem? CreateSeriesItem(User user, BaseItem item)
+    {
+        var progress = _tvSeriesService.GetProgress(user, item.Id);
+        if (!progress.HasUnwatchedEpisodes)
+        {
+            return null;
+        }
+
+        return new WatchWheelItem
+        {
+            Id = item.Id,
+            Name = item.Name,
+            Type = "Series",
+            Year = item.ProductionYear,
+            Overview = item.Overview,
+            CommunityRating = item.CommunityRating,
+            Genres = item.Genres ?? Array.Empty<string>(),
+            Played = false,
+            IsInProgress = progress.HasStarted,
+            PlaybackPositionTicks = progress.NextEpisodePlaybackPositionTicks,
+            RemainingEpisodes = progress.RemainingEpisodes,
+            NextEpisodeId = progress.NextEpisodeId,
+            NextEpisodeName = progress.NextEpisodeName,
+            NextSeasonNumber = progress.NextSeasonNumber,
+            NextEpisodeNumber = progress.NextEpisodeNumber
         };
     }
 }
