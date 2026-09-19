@@ -55,3 +55,14 @@
 .wwHistoryInfo { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
 .wwHistoryInfo .winnerMeta { margin: 6px 0 0; font-size: .85rem; }
 @media (max-width:760px) { .wwHistoryHeader { align-items: flex-start; flex-direction: column; } }
+
+/* Pending filters and keyboard/motion accessibility. */
+#WatchWheelPage .wwFilterNote { color: #ffd580; margin: -10px 0 20px; }
+#WatchWheelPage .wwFilterNote:empty { display: none; }
+#WatchWheelPage select:focus-visible,
+#WatchWheelPage input:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+    #WatchWheelPage .spinButton { transition: none; }
+    #WatchWheelPage .spinButton:hover:not(:disabled),
+    #WatchWheelPage .spinButton:active:not(:disabled) { transform: none; }
+}

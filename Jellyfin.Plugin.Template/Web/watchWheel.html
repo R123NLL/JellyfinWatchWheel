@@ -42,7 +42,9 @@
                     <label><input id="wwAvoidRecent" type="checkbox"><span>Avoid recent picks</span></label>
                 </div>
                 <button id="wwApplyFilters" type="button" class="raised emby-button button-submit">Refresh Wheel</button>
+                <button id="wwResetFilters" type="button" class="raised emby-button">Reset Filters</button>
             </section>
+            <p id="wwFilterNote" class="wwFilterNote" role="status"></p>
             <p id="wwStorageNote" class="wwStorageNote" role="status"></p>
             <div id="wwMessage" class="watchWheelMessage" role="status" aria-live="polite"></div>
             <section class="wheelSection" aria-label="Watch wheel">
@@ -84,7 +86,7 @@
     <script>
         (function () {
             var page = document.getElementById('WatchWheelPage');
-            var version = 'history-5';
+            var version = 'filters-6';
             var cssId = 'watchWheelPluginCss';
             var css = document.getElementById(cssId);
             if (!css) {

@@ -98,7 +98,7 @@
     function createApp(page) {
         var state = {
             items: [], pool: [], removed: new Set(), history: [], winner: null, rotation: 0,
-            spinning: false, loading: false, playing: false, request: 0
+            spinning: false, loading: false, playing: false, request: 0, appliedFilters: null
         };
         function byId(id) { return page.querySelector('#' + id); }
         var canvas = byId('watchWheelCanvas');
@@ -180,7 +180,37 @@
             });
         }
 
+        function filterSnapshot() {
+            return JSON.stringify(filterIds.map(function (id) { return byId(id).value; }));
+        }
+
+        function filtersPending() {
+            return state.appliedFilters !== null && state.appliedFilters !== filterSnapshot();
+        }
+
+        function reducedMotion() {
+            return typeof window.matchMedia === 'function'
+                && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        }
+
+        function filtersChanged() {
+            savePreferences(); hideWinner(); syncButtons();
+            message(filtersPending() ? 'Filters changed. Apply Filters to update the wheel.' : poolMessage());
+        }
+
+        function resetFilters() {
+            if (busy()) return;
+            byId('wwType').value = 'both';
+            byId('wwGenre').value = '';
+            byId('wwDecade').value = '';
+            byId('wwWatchStatus').value = 'all';
+            byId('wwAvoidRecent').checked = false;
+            return loadCandidates();
+        }
+
         function poolMessage() {
+            if (filtersPending()) return 'Filters changed. Apply Filters to update the wheel.';
+            if (!state.pool.length) return 'No titles match these filters. Try Reset Filters or a different combination.';
             if (eligibleItems().length) return 'Wheel ready.';
             var remaining = state.pool.filter(function (item) { return !state.removed.has(idOf(item)); });
             return remaining.length && byId('wwAvoidRecent').checked
@@ -236,9 +266,15 @@
         function syncButtons() {
             var locked = busy();
             var available = eligibleItems().length;
-            byId('wwSpin').disabled = locked || !available;
+            var pending = filtersPending();
+            page.setAttribute('aria-busy', state.loading ? 'true' : 'false');
+            byId('wwFilterNote').textContent = pending
+                ? 'Changes not applied. The count and wheel still show the previous results.' : '';
+            byId('wwApplyFilters').textContent = pending ? 'Apply Filters' : 'Refresh Wheel';
+            byId('wwResetFilters').disabled = locked;
+            byId('wwSpin').disabled = locked || pending || !available;
             byId('wwApplyFilters').disabled = locked;
-            byId('wwAgain').disabled = locked || !available;
+            byId('wwAgain').disabled = locked || pending || !available;
             byId('wwRemove').disabled = locked || !state.winner;
             byId('wwPlay').disabled = locked || !playbackTarget(state.winner);
             byId('wwOpen').disabled = locked || !state.winner;
@@ -306,7 +342,7 @@
             poster.src = posterUrl(idOf(item));
             byId('winnerCard').classList.remove('hidden');
             syncButtons();
-            byId('winnerCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            byId('winnerCard').scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'nearest' });
         }
 
         function openDetails(id) {
@@ -358,6 +394,7 @@
             if (busy()) return;
             savePreferences();
             state.removed.clear();
+            var appliedFilters = filterSnapshot();
             var request = ++state.request;
             state.loading = true;
             hideWinner();
@@ -372,6 +409,7 @@
             try {
                 var result = await window.ApiClient.getJSON(window.ApiClient.getUrl('WatchWheel/Items?' + params));
                 if (request !== state.request) return;
+                state.appliedFilters = appliedFilters;
                 state.pool = (value(result, 'Items') || []).filter(function (item) {
                     // Use the backend's episode-aware status, not the next episode's resume ticks.
                     if (watchStatus === 'in-progress') return value(item, 'IsInProgress') === true;
@@ -430,7 +468,7 @@
         }
 
         function spin() {
-            if (busy()) return;
+            if (busy() || filtersPending()) return;
             state.items = eligibleItems();
             if (!state.items.length) { syncButtons(); message(poolMessage()); return; }
             hideWinner(); state.spinning = true; syncButtons(); message('Spinning...');
@@ -440,11 +478,11 @@
             var desired = -Math.PI / 2 - (index * arc + arc / 2);
             var delta = ((desired - start) % TWO_PI + TWO_PI) % TWO_PI;
             var end = start + delta + TWO_PI * (6 + Math.floor(Math.random() * 3));
-            var duration = 5000 + Math.random() * 1300;
+            var duration = reducedMotion() ? 0 : 5000 + Math.random() * 1300;
             var started = performance.now();
             function animate(now) {
                 if (!page.isConnected) { state.spinning = false; syncButtons(); return; }
-                var progress = Math.min((now - started) / duration, 1);
+                var progress = duration === 0 ? 1 : Math.min((now - started) / duration, 1);
                 state.rotation = start + (end - start) * (1 - Math.pow(1 - progress, 5));
                 drawWheel();
                 if (progress < 1) { requestAnimationFrame(animate); return; }
@@ -468,13 +506,14 @@
 
         async function start() {
             readSaved(); renderHistory();
-            filterIds.forEach(function (id) { byId(id).addEventListener('change', savePreferences); });
+            filterIds.forEach(function (id) { byId(id).addEventListener('change', filtersChanged); });
             byId('wwAvoidRecent').addEventListener('change', function () {
                 if (busy()) return;
                 savePreferences(); refreshLocalPool();
             });
             byId('wwClearHistory').addEventListener('click', clearHistory);
             byId('wwApplyFilters').addEventListener('click', loadCandidates);
+            byId('wwResetFilters').addEventListener('click', resetFilters);
             byId('wwSpin').addEventListener('click', spin);
             byId('wwAgain').addEventListener('click', spin);
             byId('wwRemove').addEventListener('click', removeWinner);
