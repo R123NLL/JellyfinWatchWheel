@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Jellyfin.Data.Enums;
 using Jellyfin.Database.Implementations.Entities;
@@ -34,6 +35,22 @@ public class CandidateService
     }
 
     /// <summary>
+    /// Gets movie, television, and mixed libraries visible to the user.
+    /// </summary>
+    /// <param name="user">The authenticated Jellyfin user.</param>
+    /// <returns>Accessible libraries, ordered by name.</returns>
+    public IReadOnlyList<CollectionFolder> GetLibraries(User user)
+    {
+        return _libraryManager.GetUserRootFolder()
+            .GetChildren(user, true)
+            .OfType<CollectionFolder>()
+            .Where(folder => folder.CollectionType is null or CollectionType.movies or CollectionType.tvshows)
+            .OrderBy(folder => folder.Name)
+            .ThenBy(folder => folder.Id)
+            .ToArray();
+    }
+
+    /// <summary>
     /// Gets Watch Wheel candidates for a user.
     /// </summary>
     /// <param name="user">The Jellyfin user.</param>
@@ -41,6 +58,13 @@ public class CandidateService
     /// <returns>The filtered Watch Wheel result.</returns>
     public WatchWheelResult GetCandidates(User user, WatchWheelFilters filters)
     {
+        // Never turn an unknown or inaccessible library into an unrestricted query.
+        if (filters.LibraryId.HasValue
+            && !GetLibraries(user).Any(folder => folder.Id == filters.LibraryId.Value))
+        {
+            return new WatchWheelResult { Filters = filters };
+        }
+
         var type = filters.Type?.Trim().ToLowerInvariant();
         var onlyMovies = type is "movie" or "movies";
         var onlySeries = type is "series" or "tv" or "shows";
@@ -49,6 +73,7 @@ public class CandidateService
             ? Array.Empty<BaseItem>()
             : _libraryManager.GetItemList(new InternalItemsQuery(user)
             {
+                ParentId = filters.LibraryId ?? Guid.Empty,
                 Recursive = true,
                 IsPlayed = false,
                 IncludeItemTypes = [BaseItemKind.Movie],
@@ -60,6 +85,7 @@ public class CandidateService
             ? Array.Empty<BaseItem>()
             : _libraryManager.GetItemList(new InternalItemsQuery(user)
             {
+                ParentId = filters.LibraryId ?? Guid.Empty,
                 Recursive = true,
                 IncludeItemTypes = [BaseItemKind.Series],
                 EnableTotalRecordCount = false
@@ -133,6 +159,7 @@ public class CandidateService
             Played = false,
             IsInProgress = progress.HasStarted,
             PlaybackPositionTicks = progress.NextEpisodePlaybackPositionTicks,
+            RunTimeTicks = progress.NextEpisodeRunTimeTicks,
             RemainingEpisodes = progress.RemainingEpisodes,
             NextEpisodeId = progress.NextEpisodeId,
             NextEpisodeName = progress.NextEpisodeName,
@@ -157,7 +184,8 @@ public class CandidateService
             Genres = item.Genres ?? Array.Empty<string>(),
             Played = userData?.Played ?? false,
             IsInProgress = position > 0,
-            PlaybackPositionTicks = position
+            PlaybackPositionTicks = position,
+            RunTimeTicks = item.RunTimeTicks
         };
     }
 }

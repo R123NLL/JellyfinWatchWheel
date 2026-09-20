@@ -1,3 +1,5 @@
+using System;
+
 namespace Jellyfin.Plugin.WatchWheel.Models;
 
 /// <summary>
@@ -5,6 +7,11 @@ namespace Jellyfin.Plugin.WatchWheel.Models;
 /// </summary>
 public class WatchWheelFilters
 {
+    /// <summary>
+    /// Gets or sets the selected accessible library, or null for all libraries.
+    /// </summary>
+    public Guid? LibraryId { get; set; }
+
     /// <summary>
     /// Gets or sets the media type filter.
     /// </summary>

@@ -116,6 +116,7 @@ public class TvSeriesService
             progress.NextSeasonNumber = episode.ParentIndexNumber;
             progress.NextEpisodeNumber = episode.IndexNumber;
             progress.NextEpisodePlaybackPositionTicks = position;
+            progress.NextEpisodeRunTimeTicks = episode.RunTimeTicks;
         }
 
         return progressBySeries;

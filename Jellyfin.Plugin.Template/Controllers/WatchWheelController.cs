@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.WatchWheel.Models;
 using Jellyfin.Plugin.WatchWheel.Services;
@@ -79,6 +80,7 @@ public class WatchWheelController : ControllerBase
     /// <summary>
     /// Gets unwatched movies and television series for the current user.
     /// </summary>
+    /// <param name="libraryId">Optional accessible library identifier.</param>
     /// <param name="type">Optional media type filter.</param>
     /// <param name="genre">Optional genre filter.</param>
     /// <param name="decade">Optional decade filter.</param>
@@ -88,6 +90,7 @@ public class WatchWheelController : ControllerBase
     /// <returns>Watch Wheel candidate items.</returns>
     [HttpGet("Items")]
     public async Task<IActionResult> GetItems(
+        [FromQuery] Guid? libraryId = null,
         [FromQuery] string? type = null,
         [FromQuery] string? genre = null,
         [FromQuery] int? decade = null,
@@ -107,6 +110,7 @@ public class WatchWheelController : ControllerBase
 
         var filters = new WatchWheelFilters
         {
+            LibraryId = libraryId,
             Type = type ?? "both",
             Genre = genre,
             Decade = decade,

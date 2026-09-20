@@ -66,3 +66,91 @@
     #WatchWheelPage .spinButton:hover:not(:disabled),
     #WatchWheelPage .spinButton:active:not(:disabled) { transform: none; }
 }
+
+#WatchWheelPage .wwCandidates { margin-top: 32px; padding: 24px; border-radius: 18px; background: rgba(255,255,255,.055); }
+#WatchWheelPage .wwCandidateHeader,
+#WatchWheelPage .wwCandidateRow { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+#WatchWheelPage .wwCandidateHeader h2 { margin: 0; }
+#WatchWheelPage .wwCandidateSearchBar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+#WatchWheelPage #wwCandidateSearch { flex: 1 1 200px; width: auto; min-width: 0; max-width: 100%; min-height: 44px; box-sizing: border-box; }
+#WatchWheelPage .wwCandidateList { list-style: none; padding: 0; margin: 0; }
+#WatchWheelPage .wwCandidateRow { padding: 14px 0; border-top: 1px solid rgba(255,255,255,.12); }
+#WatchWheelPage .wwCandidateInfo { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+#WatchWheelPage .wwCandidateInfo .winnerMeta { margin: 6px 0 0; font-size: .85rem; }
+#WatchWheelPage .wwCandidatePagination { display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px; }
+#WatchWheelPage #wwCandidateEmpty:empty { display: none; }
+#WatchWheelPage #wwCandidateHelp, #WatchWheelPage #wwCandidateSummary { opacity: .75; }
+
+/* Compact library layout. Keep the choice, rather than the catalog, in focus. */
+#WatchWheelPage .watchWheelShell { max-width: 1080px; }
+#WatchWheelPage .filterPanel { gap: 12px; margin-bottom: 12px; }
+#WatchWheelPage .wwHint { font-size: .85rem; opacity: .7; line-height: 1.5; }
+#WatchWheelPage .wwStorageNote { margin: 8px 0 16px; font-size: .78rem; }
+#WatchWheelPage .wwFilterNote { margin: 12px 0; }
+#WatchWheelPage .wwCandidates, #WatchWheelPage .wwHistory { margin-top: 16px; padding: 18px 22px; border: 1px solid rgba(255,255,255,.1); }
+#WatchWheelPage summary { cursor: pointer; font-size: 1.05rem; font-weight: 700; padding: 4px; }
+#WatchWheelPage summary span { font-size: .8rem; font-weight: 400; opacity: .6; margin-left: 12px; }
+#WatchWheelPage summary:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+#WatchWheelPage details[open] summary { margin-bottom: 20px; }
+#WatchWheelPage .wwCandidateList { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 24px; }
+#WatchWheelPage .wwCandidateRow { flex-wrap: nowrap; }
+#WatchWheelPage .wwCandidateInfo { flex: 1; }
+#WatchWheelPage .wwCandidateInfo strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#WatchWheelPage .winnerCard { margin-top: 20px; grid-template-columns: 160px 1fr; }
+#WatchWheelPage .winnerInfo h2 { font-size: 1.7rem; }
+@media (max-width: 640px) {
+    #WatchWheelPage .watchWheelHeader { flex-direction: row; gap: 12px; }
+    #WatchWheelPage .watchWheelHeader h1 { font-size: 1.8rem; }
+    #WatchWheelPage .candidateBadge { flex-direction: column; min-width: 50px; }
+    #WatchWheelPage .filterPanel { grid-template-columns: repeat(2,minmax(0,1fr)); padding: 14px; }
+    #WatchWheelPage .filterField { min-width: 0; }
+    #WatchWheelPage .filterField select { box-sizing: border-box; }
+    #WatchWheelPage .wwCandidateList { grid-template-columns: 1fr; }
+    #WatchWheelPage summary span { display: block; margin: 6px 0 0 18px; }
+    #WatchWheelPage .winnerCard { grid-template-columns: 1fr; }
+    #WatchWheelPage .winnerPoster { max-width: 160px; }
+}
+
+/* Keep explanations on demand and reserve notices for actionable states. */
+#WatchWheelPage .wwStorageNote:empty,
+#WatchWheelPage .watchWheelMessage:empty { display: none; }
+#WatchWheelPage .wwAdvanced { grid-column: 1 / -1; border-top: 1px solid rgba(255,255,255,.1); padding-top: 10px; }
+#WatchWheelPage .wwAdvanced > summary { font-size: .9rem; }
+#WatchWheelPage .wwAdvancedGrid { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: 14px; }
+#WatchWheelPage .wwHelp { margin-top: 16px; font-size: .85rem; line-height: 1.5; opacity: .8; }
+#WatchWheelPage .wwHelp > summary { font-size: .85rem; font-weight: 400; }
+#WatchWheelPage .wwCandidateHeader { justify-content: flex-end; }
+#WatchWheelPage .wwStorageNote:not(:empty) { color: #ffd580; }
+
+/* Winner hierarchy: the playable title first, secondary information on demand. */
+#WatchWheelPage .winnerCard { gap: 24px; border: 1px solid rgba(255,255,255,.12); }
+#WatchWheelPage .winnerSeries { color: #a6dfff; font-weight: 600; margin-bottom: 6px; }
+#WatchWheelPage .winnerSeries:empty { display: none; }
+#WatchWheelPage .winnerInfo h2 { font-size: clamp(1.5rem,3vw,2rem); line-height: 1.2; }
+#WatchWheelPage .winnerEpisode { margin: 2px 0 10px; font-size: .95rem; }
+#WatchWheelPage .winnerMeta { font-size: .88rem; line-height: 1.6; margin-bottom: 12px; }
+#WatchWheelPage .winnerResume { font-size: .88rem; margin-bottom: 8px; }
+#WatchWheelPage .winnerProgress { width: 100%; height: 6px; margin: 0 0 16px; border: 0; border-radius: 4px; accent-color: #00a4dc; }
+#WatchWheelPage .winnerProgress::-webkit-progress-bar { background: rgba(255,255,255,.12); border-radius: 4px; }
+#WatchWheelPage .winnerProgress::-webkit-progress-value { background: #00a4dc; border-radius: 4px; }
+#WatchWheelPage .winnerProgress::-moz-progress-bar { background: #00a4dc; border-radius: 4px; }
+#WatchWheelPage .winnerPrimaryAction { margin-top: 4px; }
+#WatchWheelPage #wwPlay { background: #0089ba; color: #fff; font-size: 1rem; font-weight: 700; min-height: 46px; min-width: 170px; padding: 12px 24px; border-radius: 10px; }
+#WatchWheelPage .winnerActions { margin-top: 0; padding-top: 12px; gap: 8px; }
+#WatchWheelPage .winnerActions button { font-size: .82rem; min-height: 40px; padding: 8px 12px; background: rgba(255,255,255,.07); }
+#WatchWheelPage .winnerDescription { margin-top: 20px; border-top: 1px solid rgba(255,255,255,.1); padding-top: 12px; }
+#WatchWheelPage .winnerDescription > summary { font-size: .85rem; font-weight: 500; }
+#WatchWheelPage .winnerDescription[open] > summary { margin-bottom: 12px; }
+#WatchWheelPage #winnerOverview { margin: 10px 0 0; font-size: .9rem; }
+#WatchWheelPage #winnerOverview:empty, #WatchWheelPage #winnerGenres:empty { display: none; }
+#WatchWheelPage .winnerPosterWrapper { position: relative; align-self: start; aspect-ratio: 2 / 3; border-radius: 14px; overflow: hidden; background: linear-gradient(145deg,#253448,#17202d); }
+#WatchWheelPage .winnerPosterFallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; letter-spacing: .12em; opacity: .6; }
+#WatchWheelPage .winnerPoster { position: relative; }
+@media (max-width: 640px) {
+    #WatchWheelPage .winnerCard { padding: 18px; gap: 18px; }
+    #WatchWheelPage .winnerPosterWrapper { max-width: 120px; }
+    #WatchWheelPage #wwPlay { width: 100%; }
+}
+
+#WatchWheelPage .wwPlaybackMessage { margin: 10px 0 0; font-size: .9rem; line-height: 1.5; color: #ffd580; }
+#WatchWheelPage .wwPlaybackMessage:empty { display: none; }

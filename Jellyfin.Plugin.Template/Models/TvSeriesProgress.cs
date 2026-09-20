@@ -43,6 +43,11 @@ public class TvSeriesProgress
     public long NextEpisodePlaybackPositionTicks { get; set; }
 
     /// <summary>
+    /// Gets or sets the full runtime of the selected next episode.
+    /// </summary>
+    public long? NextEpisodeRunTimeTicks { get; set; }
+
+    /// <summary>
     /// Gets a value indicating whether unwatched regular episodes remain.
     /// </summary>
     public bool HasUnwatchedEpisodes => RemainingEpisodes > 0;

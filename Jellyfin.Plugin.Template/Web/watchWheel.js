@@ -16,6 +16,26 @@
     function idOf(item) { return String(value(item, 'Id') || ''); }
     function nameOf(item) { return String(value(item, 'Name') || 'Unknown'); }
 
+    function matchesRuntime(item, maxMinutes) {
+        if (!maxMinutes) return true;
+        var ticks = Number(value(item, 'RunTimeTicks'));
+        return Number.isFinite(ticks) && ticks > 0 && ticks <= maxMinutes * 600000000;
+    }
+
+    function matchesRating(item, minimum) {
+        if (!minimum) return true;
+        var raw = value(item, 'CommunityRating');
+        var rating = Number(raw);
+        return raw != null && Number.isFinite(rating) && rating >= minimum && rating <= 10;
+    }
+
+    function runtimeLabel(item) {
+        var ticks = Number(value(item, 'RunTimeTicks'));
+        return Number.isFinite(ticks) && ticks > 0
+            ? Math.ceil(ticks / 600000000) + ' min' + (isSeries(item) ? ' next episode' : '')
+            : 'Runtime unknown';
+    }
+
     function playbackTarget(item) {
         var id = isSeries(item) ? value(item, 'NextEpisodeId') : idOf(item);
         if (!id) return null;
@@ -38,6 +58,10 @@
         var seconds = Math.floor(ticks / 10000000);
         var minutes = Math.floor(seconds / 60);
         return minutes + ':' + String(seconds % 60).padStart(2, '0');
+    }
+
+    function isAndroidClient() {
+        return /Android/i.test(window.navigator && window.navigator.userAgent || '');
     }
 
     function normalizedUserId(id) {
@@ -98,7 +122,7 @@
     function createApp(page) {
         var state = {
             items: [], pool: [], removed: new Set(), history: [], winner: null, rotation: 0,
-            spinning: false, loading: false, playing: false, request: 0, appliedFilters: null
+            spinning: false, loading: false, playing: false, request: 0, appliedFilters: null, candidatePage: 0, playbackTimer: null
         };
         function byId(id) { return page.querySelector('#' + id); }
         var canvas = byId('watchWheelCanvas');
@@ -106,7 +130,7 @@
         function message(text) { byId('wwMessage').textContent = text || ''; }
         function count() { byId('candidateCount').textContent = String(eligibleItems().length); }
         function busy() { return state.spinning || state.loading || state.playing; }
-        var filterIds = ['wwType', 'wwGenre', 'wwDecade', 'wwWatchStatus'];
+        var filterIds = ['wwType', 'wwGenre', 'wwDecade', 'wwWatchStatus', 'wwRuntime', 'wwRating', 'wwYear', 'wwLibrary'];
         var storageKey = preferenceKey();
         var savedPreferences = {};
 
@@ -140,7 +164,7 @@
                         episode: typeof entry.episode === 'string' ? entry.episode : '', pickedAt: entry.pickedAt
                     };
                 }) : [];
-                storageNotice('Saved for your Jellyfin account in this browser. Recent picks are not watched history.');
+                storageNotice('');
             } catch (error) {
                 storageNotice('Saved settings could not be read. You can keep using the wheel.');
             }
@@ -155,7 +179,7 @@
                 window.localStorage.setItem(storageKey, JSON.stringify({
                     preferences: preferences, history: state.history
                 }));
-                storageNotice('Saved for your Jellyfin account in this browser. Recent picks are not watched history.');
+                storageNotice('');
             } catch (error) {
                 storageNotice('This browser could not save your settings. Changes last for this visit only.');
             }
@@ -167,7 +191,14 @@
                 var saved = savedPreferences[id];
                 if (typeof saved === 'string' && Array.from(select.options).some(function (option) {
                     return option.value === saved;
-                })) select.value = saved;
+                })) {
+                    select.value = saved;
+                } else if (id === 'wwLibrary' && typeof saved === 'string' && saved) {
+                    // Keep the previous scope if access changed or library discovery failed.
+                    var unavailable = document.createElement('option');
+                    unavailable.value = saved; unavailable.textContent = 'Previously selected library';
+                    select.appendChild(unavailable); select.value = saved;
+                }
             });
             byId('wwAvoidRecent').checked = savedPreferences.avoidRecent === true;
         }
@@ -195,7 +226,7 @@
 
         function filtersChanged() {
             savePreferences(); hideWinner(); syncButtons();
-            message(filtersPending() ? 'Filters changed. Apply Filters to update the wheel.' : poolMessage());
+            message(filtersPending() ? '' : poolMessage());
         }
 
         function resetFilters() {
@@ -204,18 +235,78 @@
             byId('wwGenre').value = '';
             byId('wwDecade').value = '';
             byId('wwWatchStatus').value = 'all';
+            byId('wwRuntime').value = '';
+            byId('wwRating').value = '';
+            byId('wwYear').value = '';
+            byId('wwLibrary').value = '';
             byId('wwAvoidRecent').checked = false;
+            byId('wwCandidateSearch').value = '';
             return loadCandidates();
         }
 
         function poolMessage() {
-            if (filtersPending()) return 'Filters changed. Apply Filters to update the wheel.';
-            if (!state.pool.length) return 'No titles match these filters. Try Reset Filters or a different combination.';
-            if (eligibleItems().length) return 'Wheel ready.';
+            if (filtersPending()) return '';
+            if (!state.pool.length) return byId('wwLibrary').value
+                ? 'No matching titles in this library, or it is unavailable. Choose another library or reset filters.'
+                : 'No titles match these filters. Try Reset Filters or a different combination.';
+            if (eligibleItems().length) return '';
             var remaining = state.pool.filter(function (item) { return !state.removed.has(idOf(item)); });
             return remaining.length && byId('wwAvoidRecent').checked
                 ? 'All matching titles are recent picks. Turn off Avoid recent picks or clear history.'
                 : 'No choices remain. Adjust your filters or refresh the wheel.';
+        }
+
+        function renderCandidates() {
+            var eligible = eligibleItems();
+            var query = byId('wwCandidateSearch').value.trim().toLocaleLowerCase();
+            var matches = eligible.filter(function (item) {
+                return nameOf(item).toLocaleLowerCase().includes(query);
+            });
+            var pageSize = 12;
+            var lastPage = Math.max(0, Math.ceil(matches.length / pageSize) - 1);
+            state.candidatePage = Math.min(state.candidatePage, lastPage);
+            var start = state.candidatePage * pageSize;
+            var locked = busy() || filtersPending();
+            var list = byId('wwCandidateList');
+            list.textContent = '';
+            byId('wwCandidateSearch').disabled = busy();
+            byId('wwCandidateClear').disabled = busy() || !byId('wwCandidateSearch').value;
+            byId('wwRestoreRemoved').disabled = locked || !state.removed.size;
+            byId('wwRestoreRemoved').textContent = 'Restore removed (' + state.removed.size + ')';
+            byId('wwCandidatePrevious').disabled = busy() || state.candidatePage === 0;
+            byId('wwCandidateNext').disabled = busy() || state.candidatePage >= lastPage;
+            byId('wwCandidateSummary').textContent = state.loading ? 'Loading titles...'
+                : (matches.length ? 'Showing ' + (start + 1) + '–' + Math.min(start + pageSize, matches.length)
+                    + ' of ' + matches.length + ' matching titles. ' : 'No matching titles. ')
+                    + eligible.length + ' choices on the wheel.';
+            byId('wwCandidateEmpty').textContent = state.loading ? '' : filtersPending()
+                ? 'Apply Filters to update this list. These are the previous results.'
+                : !eligible.length ? poolMessage()
+                : !matches.length ? 'No titles match your search. Clear search to see all choices.' : '';
+            matches.slice(start, start + pageSize).forEach(function (item) {
+                var row = document.createElement('li'); row.className = 'wwCandidateRow';
+                var info = document.createElement('div'); info.className = 'wwCandidateInfo';
+                var title = document.createElement('strong'); title.textContent = nameOf(item);
+                var meta = document.createElement('div'); meta.className = 'winnerMeta';
+                var details = [isSeries(item) ? 'TV series' : 'Movie', value(item, 'Year'),
+                    value(item, 'IsInProgress') ? 'In progress' : 'Not started', runtimeLabel(item)];
+                if (isSeries(item)) details.push('Next: ' + ([episodeCode(item), value(item, 'NextEpisodeName')]
+                    .filter(Boolean).join(' • ') || 'Next unwatched episode'));
+                meta.textContent = details.filter(Boolean).join(' • ');
+                info.appendChild(title); info.appendChild(meta); row.appendChild(info);
+                var remove = document.createElement('button');
+                remove.type = 'button'; remove.className = 'raised emby-button';
+                remove.textContent = 'Remove'; remove.disabled = locked;
+                remove.setAttribute('aria-label', 'Remove ' + nameOf(item) + ' from wheel');
+                remove.addEventListener('click', function () {
+                    if (busy() || filtersPending()) return;
+                    state.removed.add(idOf(item));
+                    if (state.winner && idOf(state.winner) === idOf(item)) hideWinner();
+                    refreshLocalPool();
+                    byId('wwCandidateSearch').focus();
+                });
+                row.appendChild(remove); list.appendChild(row);
+            });
         }
 
         function renderHistory() {
@@ -264,6 +355,8 @@
         }
 
         function syncButtons() {
+            var selectedExtras = ['wwDecade', 'wwRuntime', 'wwRating', 'wwYear', 'wwLibrary'].filter(function (id) { return byId(id).value !== ''; }).length;
+            byId('wwMoreFiltersSummary').textContent = 'More filters' + (selectedExtras ? ' (' + selectedExtras + ' selected)' : '');
             var locked = busy();
             var available = eligibleItems().length;
             var pending = filtersPending();
@@ -282,8 +375,14 @@
             byId('wwClearHistory').disabled = locked || !state.history.length;
             byId('wwAvoidRecent').disabled = locked;
             filterIds.forEach(function (id) { byId(id).disabled = locked; });
+            renderCandidates();
         }
+        function playbackMessage(text) { byId('wwPlaybackMessage').textContent = text || ''; }
+
         function hideWinner() {
+            clearTimeout(state.playbackTimer);
+            state.playbackTimer = null;
+            playbackMessage('');
             state.winner = null;
             byId('winnerCard').classList.add('hidden');
         }
@@ -296,22 +395,34 @@
         }
 
         function showWinner(item) {
+            playbackMessage('');
             state.winner = item;
-            byId('winnerTitle').textContent = nameOf(item);
-            var parts = [value(item, 'Type'), value(item, 'Year')].filter(Boolean);
+            var series = isSeries(item);
+            var target = playbackTarget(item);
+            var code = episodeCode(item);
+            var episodeName = value(item, 'NextEpisodeName');
+            var episode = [code, episodeName].filter(Boolean).join(' • ');
+            byId('winnerSeries').textContent = series ? nameOf(item) : '';
+            byId('winnerTitle').textContent = series ? (episodeName || 'Next episode') : nameOf(item);
+            byId('winnerEpisode').textContent = series
+                ? (target ? code : 'No next episode available. Refresh the wheel.') : '';
+            var duration = Number(value(item, 'RunTimeTicks'));
+            var knownDuration = Number.isFinite(duration) && duration > 0;
+            var parts = [series ? 'TV episode' : 'Movie', value(item, 'Year')].filter(Boolean);
+            if (knownDuration) parts.push(Math.ceil(duration / 600000000) + ' min');
             var rating = value(item, 'CommunityRating');
-            if (rating != null && Number.isFinite(Number(rating))) parts.push('★ ' + Number(rating).toFixed(1));
-            var remaining = value(item, 'RemainingEpisodes');
-            if (isSeries(item) && remaining != null) {
-                parts.push(remaining + (Number(remaining) === 1 ? ' episode remaining' : ' episodes remaining'));
+            if (rating != null && Number.isFinite(Number(rating)) && Number(rating) > 0 && Number(rating) <= 10) {
+                parts.push('★ ' + Number(rating).toFixed(1) + (series ? ' series' : ''));
             }
             byId('winnerMeta').textContent = parts.join(' • ');
-            var target = playbackTarget(item);
-            var episode = [episodeCode(item), value(item, 'NextEpisodeName')].filter(Boolean).join(' • ');
-            byId('winnerEpisode').textContent = isSeries(item)
-                ? (target ? 'Next: ' + (episode || 'Next unwatched episode') : 'No next episode available. Refresh the wheel.') : '';
-            byId('winnerResume').textContent = target && target.ticks > 0
-                ? 'Resume at ' + timeLabel(target.ticks) : '';
+            var hasResume = target && target.ticks > 0;
+            var validProgress = hasResume && knownDuration && target.ticks <= duration;
+            var resume = hasResume ? 'Resume at ' + timeLabel(target.ticks) : '';
+            if (validProgress && duration > target.ticks) resume += ' · ' + Math.ceil((duration - target.ticks) / 600000000) + ' min left';
+            byId('winnerResume').textContent = resume;
+            var progress = byId('winnerProgress');
+            progress.value = validProgress ? target.ticks / duration * 100 : 0;
+            progress.classList.toggle('hidden', !validProgress);
             var action = target && target.ticks > 0 ? 'Resume' : 'Play';
             var playLabel = action;
             if (isSeries(item)) {
@@ -333,10 +444,18 @@
                 tag.textContent = genre;
                 genres.appendChild(tag);
             });
-            byId('winnerOverview').textContent = value(item, 'Overview') || 'No overview available.';
+            var overview = value(item, 'Overview') || '';
+            byId('winnerOverview').textContent = overview;
+            byId('winnerDescription').open = false;
+            byId('winnerDescription').classList.toggle('hidden', !overview && !(value(item, 'Genres') || []).length);
+            byId('winnerDescriptionLabel').textContent = series ? 'About the series' : 'About the movie';
             var poster = byId('winnerPoster');
+            var fallback = byId('winnerPosterFallback');
+            fallback.textContent = series ? 'TV' : 'MOVIE';
+            fallback.classList.remove('hidden');
             poster.style.display = 'block';
-            poster.onerror = function () { poster.style.display = 'none'; };
+            poster.onload = function () { fallback.classList.add('hidden'); };
+            poster.onerror = function () { poster.style.display = 'none'; fallback.classList.remove('hidden'); };
             poster.alt = nameOf(item);
             // Artwork and series details deliberately retain the series identifier.
             poster.src = posterUrl(idOf(item));
@@ -352,21 +471,90 @@
                 + (serverId ? '&serverId=' + encodeURIComponent(serverId) : '');
         }
 
-        async function playWinner() {
-            if (busy() || !state.winner) return;
-            var target = playbackTarget(state.winner);
-            if (!target) { message('No episode is available. Refresh the wheel.'); return; }
+        function tryAndroidPlayback(event, target) {
+            var container = byId('wwPlaybackContainer');
+            var button = byId('wwPlay');
+            var api = window.ApiClient;
+            var serverId = typeof api.serverId === 'function' ? api.serverId() : '';
+            // Jellyfin's registered items container delegates a real tap to its playback manager.
+            // Keep the trusted click synchronous; no synthetic clicks or remote retry.
+            if (!event || typeof container.refreshItems !== 'function' || !serverId) {
+                if (event) event.stopPropagation();
+                playbackMessage('Opening Jellyfin details. Tap Play or Resume there.');
+                openDetails(target.id);
+                return;
+            }
+            button.setAttribute('data-id', target.id);
+            button.setAttribute('data-serverid', serverId);
+            button.setAttribute('data-type', isSeries(state.winner) ? 'Episode' : 'Movie');
+            button.setAttribute('data-mediatype', 'Video');
+            button.setAttribute('data-isfolder', 'false');
+            button.setAttribute('data-positionticks', String(target.ticks));
+            button.setAttribute('data-action', target.ticks > 0 ? 'resume' : 'play');
+            button.classList.add('itemAction');
             state.playing = true;
             syncButtons();
-            message(target.ticks > 0 ? 'Resuming playback...' : 'Starting playback...');
+            playbackMessage('Opening Jellyfin player...');
+            state.playbackTimer = setTimeout(function () {
+                button.classList.remove('itemAction');
+                button.setAttribute('data-action', 'none');
+                if (!event.defaultPrevented) {
+                    state.playing = false;
+                    if (page.isConnected) {
+                        syncButtons();
+                        playbackMessage('Opening Jellyfin details. Tap Play or Resume there.');
+                        openDetails(target.id);
+                    }
+                    return;
+                }
+                // The event was handled, but that alone does not confirm playback started.
+                state.playbackTimer = setTimeout(function () {
+                    state.playing = false;
+                    if (!page.isConnected) return;
+                    syncButtons();
+                    playbackMessage(document.hidden ? '' : 'If playback has not started, use '
+                        + (isSeries(state.winner) ? 'Episode Details' : 'Movie Details') + ' below.');
+                }, 5000);
+            }, 0);
+        }
+
+        async function playWinner(event) {
+            if (busy() || !state.winner) {
+                if (event) event.stopPropagation();
+                return;
+            }
+            var target = playbackTarget(state.winner);
+            if (!target) {
+                if (event) event.stopPropagation();
+                playbackMessage('No episode is available. Refresh the wheel.');
+                return;
+            }
+            if (isAndroidClient()) {
+                try {
+                    tryAndroidPlayback(event, target);
+                } catch (error) {
+                    if (event) event.stopPropagation();
+                    byId('wwPlay').classList.remove('itemAction');
+                    state.playing = false;
+                    syncButtons();
+                    playbackMessage('Could not open the Android player. Use '
+                        + (isSeries(state.winner) ? 'Episode Details' : 'Movie Details') + ' below.');
+                }
+                return;
+            }
+            if (event) event.stopPropagation();
+            state.playing = true;
+            syncButtons();
+            playbackMessage(target.ticks > 0 ? 'Resuming playback...' : 'Starting playback...');
             try {
                 await sendSessionPlayback(target);
-                message('Playback requested.');
+                playbackMessage('Playback requested. If it does not start, use '
+                    + (isSeries(state.winner) ? 'Episode Details' : 'Movie Details') + ' below.');
             } catch (error) {
                 console.error('Watch Wheel playback failed:', error);
-                message((error.message || 'Could not start playback here.') + ' Use '
+                playbackMessage((error.message || 'Could not start playback here.') + ' Use '
                     + (isSeries(state.winner) ? 'Episode Details' : 'Movie Details')
-                    + ' to play it in Jellyfin.');
+                    + ' below.');
             } finally {
                 state.playing = false;
                 syncButtons();
@@ -388,12 +576,25 @@
             }
             populate('wwGenre', value(result, 'Genres') || [], 'Any Genre', '');
             populate('wwDecade', value(result, 'Decades') || [], 'Any Decade', 's');
+            populate('wwYear', value(result, 'Years') || [], 'Any year', '');
+            var librarySelect = byId('wwLibrary');
+            librarySelect.textContent = '';
+            var allLibraries = document.createElement('option');
+            allLibraries.value = ''; allLibraries.textContent = 'All libraries'; librarySelect.appendChild(allLibraries);
+            (value(result, 'Libraries') || []).forEach(function (library) {
+                var id = value(library, 'Id');
+                if (!id) return;
+                var option = document.createElement('option');
+                option.value = String(id); option.textContent = String(value(library, 'Name') || 'Library');
+                librarySelect.appendChild(option);
+            });
         }
 
         async function loadCandidates() {
             if (busy()) return;
             savePreferences();
             state.removed.clear();
+            state.candidatePage = 0;
             var appliedFilters = filterSnapshot();
             var request = ++state.request;
             state.loading = true;
@@ -402,8 +603,12 @@
             message('Loading your Jellyfin library...');
             var params = new URLSearchParams();
             params.set('type', byId('wwType').value || 'both');
+            if (byId('wwLibrary').value) params.set('libraryId', byId('wwLibrary').value);
             if (byId('wwGenre').value) params.set('genre', byId('wwGenre').value);
             if (byId('wwDecade').value) params.set('decade', byId('wwDecade').value);
+            var maxMinutes = Number(byId('wwRuntime').value);
+            var minimumRating = Number(byId('wwRating').value);
+            var releaseYear = byId('wwYear').value;
             var watchStatus = byId('wwWatchStatus').value || 'all';
             params.set('includeInProgress', watchStatus === 'not-started' ? 'false' : 'true');
             try {
@@ -411,6 +616,8 @@
                 if (request !== state.request) return;
                 state.appliedFilters = appliedFilters;
                 state.pool = (value(result, 'Items') || []).filter(function (item) {
+                    if (!matchesRuntime(item, maxMinutes) || !matchesRating(item, minimumRating)) return false;
+                    if (releaseYear && String(value(item, 'Year')) !== releaseYear) return false;
                     // Use the backend's episode-aware status, not the next episode's resume ticks.
                     if (watchStatus === 'in-progress') return value(item, 'IsInProgress') === true;
                     if (watchStatus === 'not-started') return value(item, 'IsInProgress') === false;
@@ -418,10 +625,7 @@
                 });
                 state.items = eligibleItems();
                 state.rotation = 0;
-                var statusLabel = watchStatus === 'in-progress' ? 'In progress'
-                    : watchStatus === 'not-started' ? 'Not started' : 'All unwatched';
-                message(state.items.length ? 'Wheel ready · ' + statusLabel + '.'
-                    : poolMessage());
+                message(poolMessage());
             } catch (error) {
                 state.items = []; state.pool = [];
                 console.error('Watch Wheel failed to load items:', error);
@@ -506,6 +710,26 @@
 
         async function start() {
             readSaved(); renderHistory();
+            byId('wwCandidateSearch').addEventListener('input', function () {
+                state.candidatePage = 0; renderCandidates();
+            });
+            byId('wwCandidateClear').addEventListener('click', function () {
+                if (busy()) return;
+                byId('wwCandidateSearch').value = ''; state.candidatePage = 0;
+                renderCandidates(); byId('wwCandidateSearch').focus();
+            });
+            byId('wwCandidatePrevious').addEventListener('click', function () {
+                if (busy()) return;
+                state.candidatePage = Math.max(0, state.candidatePage - 1); renderCandidates();
+            });
+            byId('wwCandidateNext').addEventListener('click', function () {
+                if (busy()) return;
+                state.candidatePage++; renderCandidates();
+            });
+            byId('wwRestoreRemoved').addEventListener('click', function () {
+                if (busy() || filtersPending()) return;
+                state.removed.clear(); refreshLocalPool();
+            });
             filterIds.forEach(function (id) { byId(id).addEventListener('change', filtersChanged); });
             byId('wwAvoidRecent').addEventListener('change', function () {
                 if (busy()) return;

@@ -25,7 +25,7 @@ public class FilterService
     /// Gets global filter options, including eligible in-progress items.
     /// </summary>
     /// <param name="user">The Jellyfin user.</param>
-    /// <returns>Available media types, genres, and decades.</returns>
+    /// <returns>Available media types, genres, decades, and release years.</returns>
     public object GetAvailableFilters(User user)
     {
         var items = _candidateService.GetCandidates(user, new WatchWheelFilters
@@ -48,11 +48,22 @@ public class FilterService
             .OrderBy(decade => decade)
             .ToArray();
 
+        var years = items
+            .Where(item => item.Year.HasValue)
+            .Select(item => item.Year!.Value)
+            .Distinct()
+            .OrderByDescending(year => year)
+            .ToArray();
+
         return new
         {
             Types = new[] { "both", "movie", "series" },
             Genres = genres,
-            Decades = decades
+            Decades = decades,
+            Years = years,
+            Libraries = _candidateService.GetLibraries(user)
+                .Select(folder => new { folder.Id, folder.Name })
+                .ToArray()
         };
     }
 }

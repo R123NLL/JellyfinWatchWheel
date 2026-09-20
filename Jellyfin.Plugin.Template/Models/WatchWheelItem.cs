@@ -59,6 +59,11 @@ public class WatchWheelItem
     public long PlaybackPositionTicks { get; set; }
 
     /// <summary>
+    /// Gets or sets the full runtime of the movie or selected next episode.
+    /// </summary>
+    public long? RunTimeTicks { get; set; }
+
+    /// <summary>
     /// Gets or sets the number of unwatched regular episodes; applies only to series.
     /// </summary>
     public int? RemainingEpisodes { get; set; }
